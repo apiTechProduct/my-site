@@ -430,11 +430,14 @@ module.exports = async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { conversation, intakeData } = req.body;
+  const { conversation, intakeData, messages: bodyMessages, intake_data } = req.body;
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'OPENROUTER_API_KEY not configured' });
 
-  if (!conversation && !intakeData) {
+  const resolvedIntake = intakeData || intake_data;
+  const resolvedConversation = conversation || bodyMessages;
+
+  if (!resolvedConversation && !resolvedIntake) {
     return res.status(400).json({ error: 'conversation or intakeData required' });
   }
 
@@ -442,9 +445,9 @@ module.exports = async function handler(req, res) {
   proposalPdfBase64 = null;
 
   // Build context from intake data or conversation transcript
-  const intakeContext = intakeData
-    ? `VISITOR INTAKE DATA:\n${JSON.stringify(intakeData, null, 2)}`
-    : `CONVERSATION TRANSCRIPT:\n${conversation.map(m => `${m.role}: ${m.content}`).join('\n')}`;
+  const intakeContext = resolvedIntake
+    ? `VISITOR INTAKE DATA:\n${JSON.stringify(resolvedIntake, null, 2)}`
+    : `CONVERSATION TRANSCRIPT:\n${resolvedConversation.map(m => `${m.role}: ${m.content}`).join('\n')}`;
 
   // Build tools list — store_lead only available if Supabase is configured
   const tools = getTools();
