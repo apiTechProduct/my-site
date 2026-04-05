@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 272 92" fill="none"
+     role="img" aria-label="Pallavi Sher — The Human Stack">
+  <title>Pallavi Sher · The Human Stack</title>
+
+  <!--
+    Logo V2 — Typographic
+    Two-line editorial treatment using Playfair Display:
+      "The Human" — bold italic, medium size
+      "Stack."    — bold, large, period in amber accent
+    Brand descriptor and accent rule above.
+    Use currentColor for main text — set parent color for light/dark switching.
+    Amber (#C8924A) descriptor and period accent are hardcoded (visible on both backgrounds).
+  -->
+
+  <!-- ── BRAND DESCRIPTOR ── -->
+  <text
+    x="2" y="13"
+    font-family="Inter, system-ui, -apple-system, sans-serif"
+    font-weight="300"
+    font-size="9"
+    letter-spacing="2.6"
+    fill="#C8924A">THE HUMAN STACK</text>
+
+  <!-- ── AMBER ACCENT RULE ── -->
+  <line x1="0" y1="20" x2="158" y2="20" stroke="#C8924A" stroke-width="1.5"/>
+
+  <!-- ── "The Human" — Playfair Display Bold Italic ── -->
+  <text
+    x="2" y="50"
+    font-family="'Playfair Display', 'Palatino Linotype', Georgia, serif"
+    font-weight="700"
+    font-style="italic"
+    font-size="24"
+    fill="currentColor">The Human</text>
+
+  <!-- ── "Stack." — Playfair Display Bold, amber period ── -->
+  <text
+    x="2" y="83"
+    font-family="'Playfair Display', 'Palatino Linotype', Georgia, serif"
+    font-weight="700"
+    font-size="44"
+    fill="currentColor">Stack<tspan fill="#C8924A">.</tspan></text>
+
+</svg>

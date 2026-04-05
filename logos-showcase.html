@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Logo Showcase — The Human Stack</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --dark:    #0C0F1E;
+      --light:   #F7F4EE;
+      --amber:   #C8924A;
+      --mid:     #6B7280;
+      --border:  rgba(0,0,0,0.08);
+    }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: #F0EDE6;
+      color: var(--dark);
+      min-height: 100vh;
+      padding: 48px 24px 80px;
+    }
+
+    /* ── HEADER ── */
+    .page-header {
+      max-width: 960px;
+      margin: 0 auto 52px;
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .page-title {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--dark);
+      line-height: 1.1;
+    }
+    .page-title span {
+      color: var(--amber);
+    }
+    .page-meta {
+      font-size: 11px;
+      font-weight: 300;
+      letter-spacing: 0.18em;
+      color: var(--mid);
+      text-transform: uppercase;
+    }
+
+    /* ── LAYOUT ── */
+    .showcase {
+      max-width: 960px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 40px;
+    }
+
+    /* Each row is a background context */
+    .context-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .context-label {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--mid);
+    }
+    .context-label::before {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(0,0,0,0.12);
+    }
+    .context-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(0,0,0,0.12);
+    }
+
+    /* ── LOGO CARDS ── */
+    .logo-card {
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.06);
+    }
+
+    .logo-card-header {
+      padding: 10px 20px 9px;
+      border-bottom: 1px solid rgba(0,0,0,0.07);
+      background: rgba(255,255,255,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .logo-label {
+      font-size: 10.5px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--dark);
+      opacity: 0.7;
+    }
+    .logo-type {
+      font-size: 9.5px;
+      font-weight: 300;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--amber);
+    }
+
+    .logo-display {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 48px 32px;
+      min-height: 180px;
+    }
+
+    /* Light background context */
+    .logo-display.bg-light {
+      background: #FAFAF8;
+      color: var(--dark);
+    }
+
+    /* Dark background context */
+    .logo-display.bg-dark {
+      background: var(--dark);
+      color: #F7F4EE;
+    }
+    .logo-card.dark .logo-card-header {
+      background: rgba(12, 15, 30, 0.85);
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+    .logo-card.dark .logo-label {
+      color: #F7F4EE;
+      opacity: 0.6;
+    }
+
+    /* ── INLINE SVG SIZING ── */
+    .logo-display svg {
+      width: 100%;
+      max-width: 320px;
+      height: auto;
+    }
+
+    /* Logo 2 is square-ish, constrain differently */
+    .logo-display.v2 svg {
+      max-width: 240px;
+    }
+
+    /* ── FOOTER NOTE ── */
+    .note {
+      max-width: 960px;
+      margin: 48px auto 0;
+      padding: 20px 24px;
+      background: white;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px 32px;
+    }
+    .note-item h4 {
+      font-size: 10.5px;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--amber);
+      margin-bottom: 6px;
+    }
+    .note-item p {
+      font-size: 12.5px;
+      font-weight: 300;
+      color: var(--mid);
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+
+  <header class="page-header">
+    <h1 class="page-title">Logo Options<span>.</span></h1>
+    <p class="page-meta">The Human Stack &middot; Pallavi Sher &middot; 2026</p>
+  </header>
+
+  <main class="showcase">
+
+    <!-- ── LIGHT BACKGROUND ── -->
+    <div class="context-row">
+      <div class="context-label">On Light Background</div>
+
+      <!-- Logo 1 — Light -->
+      <div class="logo-card light">
+        <div class="logo-card-header">
+          <span class="logo-label">Logo 1</span>
+          <span class="logo-type">Mark + Wordmark</span>
+        </div>
+        <div class="logo-display bg-light">
+          <!-- LOGO V1 INLINED -->
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 288 56" fill="none"
+               role="img" aria-label="The Human Stack — Pallavi Sher">
+            <circle cx="24" cy="10" r="6.5" fill="#C8924A"/>
+            <rect x="4"  y="23" width="40" height="4.5" rx="2.25" fill="#C8924A"/>
+            <rect x="9"  y="32" width="30" height="4.5" rx="2.25" fill="#C8924A"/>
+            <rect x="14" y="41" width="20" height="4.5" rx="2.25" fill="#C8924A"/>
+            <line x1="56" y1="7" x2="56" y2="49"
+                  stroke="currentColor" stroke-width="0.75" stroke-opacity="0.18"/>
+            <text x="66" y="28"
+                  font-family="Inter, system-ui, sans-serif"
+                  font-weight="600" font-size="15" letter-spacing="1.3"
+                  fill="currentColor">THE HUMAN STACK</text>
+            <text x="67" y="43"
+                  font-family="Inter, system-ui, sans-serif"
+                  font-weight="300" font-size="8.5" letter-spacing="1.9"
+                  fill="currentColor" opacity="0.52">PALLAVI SHER · DIRECTOR PM</text>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Logo 2 — Light -->
+      <div class="logo-card light">
+        <div class="logo-card-header">
+          <span class="logo-label">Logo 2</span>
+          <span class="logo-type">Typographic</span>
+        </div>
+        <div class="logo-display bg-light v2">
+          <!-- LOGO V2 INLINED -->
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 272 92" fill="none"
+               role="img" aria-label="Pallavi Sher — The Human Stack">
+            <text x="2" y="13"
+                  font-family="Inter, system-ui, sans-serif"
+                  font-weight="300" font-size="9" letter-spacing="2.6"
+                  fill="#C8924A">THE HUMAN STACK</text>
+            <line x1="0" y1="20" x2="158" y2="20" stroke="#C8924A" stroke-width="1.5"/>
+            <text x="2" y="50"
+                  font-family="'Playfair Display', 'Palatino Linotype', Georgia, serif"
+                  font-weight="700" font-style="italic" font-size="24"
+                  fill="currentColor">The Human</text>
+            <text x="2" y="83"
+                  font-family="'Playfair Display', 'Palatino Linotype', Georgia, serif"
+                  font-weight="700" font-size="44"
+                  fill="currentColor">Stack<tspan fill="#C8924A">.</tspan></text>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── DARK BACKGROUND ── -->
+    <div class="context-row">
+      <div class="context-label">On Dark Background</div>
+
+      <!-- Logo 1 — Dark -->
+      <div class="logo-card dark">
+        <div class="logo-card-header">
+          <span class="logo-label">Logo 1</span>
+          <span class="logo-type">Mark + Wordmark</span>
+        </div>
+        <div class="logo-display bg-dark">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 288 56" fill="none"
+               role="img" aria-label="The Human Stack — Pallavi Sher">
+            <circle cx="24" cy="10" r="6.5" fill="#C8924A"/>
+            <rect x="4"  y="23" width="40" height="4.5" rx="2.25" fill="#C8924A"/>
+            <rect x="9"  y="32" width="30" height="4.5" rx="2.25" fill="#C8924A"/>
+            <rect x="14" y="41" width="20" height="4.5" rx="2.25" fill="#C8924A"/>
+            <line x1="56" y1="7" x2="56" y2="49"
+                  stroke="currentColor" stroke-width="0.75" stroke-opacity="0.18"/>
+            <text x="66" y="28"
+                  font-family="Inter, system-ui, sans-serif"
+                  font-weight="600" font-size="15" letter-spacing="1.3"
+                  fill="currentColor">THE HUMAN STACK</text>
+            <text x="67" y="43"
+                  font-family="Inter, system-ui, sans-serif"
+                  font-weight="300" font-size="8.5" letter-spacing="1.9"
+                  fill="currentColor" opacity="0.52">PALLAVI SHER · DIRECTOR PM</text>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Logo 2 — Dark -->
+      <div class="logo-card dark">
+        <div class="logo-card-header">
+          <span class="logo-label">Logo 2</span>
+          <span class="logo-type">Typographic</span>
+        </div>
+        <div class="logo-display bg-dark v2">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 272 92" fill="none"
+               role="img" aria-label="Pallavi Sher — The Human Stack">
+            <text x="2" y="13"
+                  font-family="Inter, system-ui, sans-serif"
+                  font-weight="300" font-size="9" letter-spacing="2.6"
+                  fill="#C8924A">THE HUMAN STACK</text>
+            <line x1="0" y1="20" x2="158" y2="20" stroke="#C8924A" stroke-width="1.5"/>
+            <text x="2" y="50"
+                  font-family="'Playfair Display', 'Palatino Linotype', Georgia, serif"
+                  font-weight="700" font-style="italic" font-size="24"
+                  fill="currentColor">The Human</text>
+            <text x="2" y="83"
+                  font-family="'Playfair Display', 'Palatino Linotype', Georgia, serif"
+                  font-weight="700" font-size="44"
+                  fill="currentColor">Stack<tspan fill="#C8924A">.</tspan></text>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ── USAGE NOTES ── -->
+  <div class="note">
+    <div class="note-item">
+      <h4>Logo 1 — Best for</h4>
+      <p>Nav bar, email signatures, slide decks, favicons (mark only). Horizontal layout, scales to small sizes.</p>
+    </div>
+    <div class="note-item">
+      <h4>Logo 2 — Best for</h4>
+      <p>Hero sections, speaking bios, printed materials, social banners. Editorial weight, name-forward identity.</p>
+    </div>
+    <div class="note-item">
+      <h4>Color system</h4>
+      <p>Amber #C8924A — accent, always hardcoded. Text: #0C0F1E on light &middot; #F7F4EE on dark.</p>
+    </div>
+    <div class="note-item">
+      <h4>Fonts</h4>
+      <p>Playfair Display 700 / 700i &middot; Inter 300, 600. Both already loaded in your site.</p>
+    </div>
+  </div>
+
+</body>
+</html>
