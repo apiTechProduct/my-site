@@ -8,13 +8,20 @@
 //       → Claude writes a proposal, renders a PDF, emails it, and alerts you
 //       → All autonomously, in 2-3 turns
 //
-// Tools: 3 core (render PDF, send email, alert owner)
-//        + 1 optional (store lead in Supabase — enabled when env vars present)
+// Tools: 4 core (render PDF, send email, store lead, alert owner)
 //
 // Works with: Express (local dev via server.js) and Vercel (production)
+//
+// APPROVAL MODE (APPROVAL_MODE=true in env):
+//   Instead of emailing the visitor directly, stores the proposal, emails
+//   the owner for review, and sends a Telegram alert with an approval link.
+//   The visitor only gets the email after the owner approves via
+//   /api/approve-proposal?id=...
 // ============================================================================
 
 const { PDFDocument, rgb, StandardFonts } = require('pdf-lib');
+const crypto = require('crypto');
+const { storePendingProposal } = require('./_pending-proposals');
 
 // ── Tool definitions for Claude ─────────────────────────────────────────────
 // These are the "hands" Claude can use. Claude decides WHEN and HOW to use them.
@@ -80,36 +87,30 @@ const CORE_TOOLS = [
   },
 ];
 
-// Optional tool — only available if Supabase is configured (Power Up: Lead Storage)
 const STORE_LEAD_TOOL = {
   type: 'function',
   function: {
     name: 'store_lead',
-    description: 'Stores the lead in the CRM database with score and conversation data.',
+    description: 'Stores the lead in the CRM database. Score the lead HIGH/MEDIUM/LOW using the triage rules in your system prompt before calling this.',
     parameters: {
       type: 'object',
       properties: {
-        name: { type: 'string', description: 'Contact name' },
-        company: { type: 'string', description: 'Company name' },
-        email: { type: 'string', description: 'Contact email' },
-        industry: { type: 'string', description: 'Company industry' },
+        name:      { type: 'string', description: 'Contact name' },
+        company:   { type: 'string', description: 'Company name' },
+        email:     { type: 'string', description: 'Contact email' },
+        industry:  { type: 'string', description: 'Company industry' },
         challenge: { type: 'string', description: 'Their main challenge (1-2 sentences)' },
-        budget: { type: 'string', description: 'Budget range mentioned' },
-        score: { type: 'string', enum: ['HIGH', 'MEDIUM', 'LOW'], description: 'Lead score based on triage rules' },
-        status: { type: 'string', description: 'Lead status, e.g. proposal_sent' },
+        budget:    { type: 'string', description: 'Budget range mentioned' },
+        score:     { type: 'string', enum: ['HIGH', 'MEDIUM', 'LOW'], description: 'Lead score you determined from triage rules' },
+        status:    { type: 'string', description: 'Lead status, e.g. proposal_sent' },
       },
       required: ['name', 'company', 'email', 'score', 'status'],
     },
   },
 };
 
-// Build tools list — Supabase tool is included only when configured
 function getTools() {
-  const tools = [...CORE_TOOLS];
-  if (process.env.SUPABASE_URL && process.env.SUPABASE_KEY) {
-    tools.push(STORE_LEAD_TOOL);
-  }
-  return tools;
+  return [...CORE_TOOLS, STORE_LEAD_TOOL];
 }
 
 // ── PDF text sanitizer ──────────────────────────────────────────────────────
@@ -148,9 +149,18 @@ function sanitizeForPdf(text) {
     .replace(/[^\x09\x0A\x0D\x20-\x7E]/g, '');
 }
 
-// ── Tool implementations ────────────────────────────────────────────────────
+// ── Request-scoped state ────────────────────────────────────────────────────
+// Reset at the start of every request handler invocation.
+// (Module-level is shared between concurrent requests on the same instance,
+//  but Vercel serverless invocations are isolated, so this is safe in prod.)
 
-let proposalPdfBase64 = null; // Stored in memory for the email attachment step
+let proposalPdfBase64 = null;
+let pendingProposalId = null;
+let capturedLeadData = {};
+let capturedProposalSections = [];
+let capturedIntakeContext = '';
+
+// ── Tool implementations ────────────────────────────────────────────────────
 
 async function renderProposalPdf({ company_name, contact_name, sections }) {
   // Sanitize ALL text before rendering
@@ -160,6 +170,9 @@ async function renderProposalPdf({ company_name, contact_name, sections }) {
     heading: sanitizeForPdf(s.heading),
     body: sanitizeForPdf(s.body),
   }));
+
+  // Capture sections for pending proposal storage
+  capturedProposalSections = sections;
 
   const pdf = await PDFDocument.create();
   const font = await pdf.embedFont(StandardFonts.Helvetica);
@@ -261,6 +274,41 @@ async function renderProposalPdf({ company_name, contact_name, sections }) {
 }
 
 async function sendEmail({ to, subject, body, attach_pdf }) {
+  const approvalMode = process.env.APPROVAL_MODE === 'true';
+
+  if (approvalMode) {
+    // In approval mode: redirect to owner, store pending proposal
+    const ownerEmail = process.env.OWNER_EMAIL || 'sher.pallavi@gmail.com';
+    const approvalUrl = `${process.env.SITE_URL || 'https://my-site-blue-kappa.vercel.app'}/api/approve-proposal?id=${pendingProposalId}`;
+
+    // Store pending proposal so the approval endpoint can access it
+    await storePendingProposal(pendingProposalId, {
+      visitor_email: to,
+      visitor_subject: subject,
+      visitor_body: body,
+      pdf_base64: proposalPdfBase64,
+      lead_name: capturedLeadData.name || '',
+      lead_company: capturedLeadData.company || '',
+      lead_challenge: capturedLeadData.challenge || '',
+      lead_score: capturedLeadData.score || '',
+      proposal_sections: capturedProposalSections,
+      intake_context: capturedIntakeContext,
+    });
+
+    console.log(`Approval mode: stored pending proposal ${pendingProposalId}, emailing owner`);
+
+    // Email the owner for review (not the visitor)
+    const ownerSubject = `[REVIEW REQUIRED] Proposal for ${capturedLeadData.company || to}`;
+    const ownerBody = `A new proposal is ready for your review.\n\nLead: ${capturedLeadData.name || 'Unknown'} — ${capturedLeadData.company || ''}\nScore: ${capturedLeadData.score || 'TBD'}\nChallenge: ${capturedLeadData.challenge || ''}\n\nApproval link: ${approvalUrl}\n\nThe proposal PDF is attached.`;
+
+    const result = await sendEmailViaResend(ownerEmail, ownerSubject, ownerBody, true);
+    return { ...result, approval_pending: true, proposal_id: pendingProposalId, approval_url: approvalUrl };
+  }
+
+  return sendEmailViaResend(to, subject, body, attach_pdf);
+}
+
+async function sendEmailViaResend(to, subject, body, attach_pdf) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return { success: false, error: 'RESEND_API_KEY not configured' };
 
@@ -300,6 +348,15 @@ async function sendEmail({ to, subject, body, attach_pdf }) {
 }
 
 async function storeLead(leadData) {
+  // Capture lead data for pending proposal storage (used by sendEmail in approval mode)
+  capturedLeadData = {
+    name: leadData.name,
+    company: leadData.company,
+    email: leadData.email,
+    challenge: leadData.challenge,
+    score: leadData.score,
+  };
+
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_KEY;
   if (!url || !key) return { success: false, error: 'Supabase not configured' };
@@ -343,11 +400,22 @@ async function alertOwner({ message }) {
   const chatId = process.env.TELEGRAM_CHAT_ID;
   if (!botToken || !chatId) return { success: false, error: 'Telegram not configured' };
 
+  const approvalMode = process.env.APPROVAL_MODE === 'true';
+
+  // In approval mode, inject approval link into the message if not already present
+  let finalMessage = message;
+  if (approvalMode && pendingProposalId) {
+    const approvalUrl = `${process.env.SITE_URL || 'https://my-site-blue-kappa.vercel.app'}/api/approve-proposal?id=${pendingProposalId}`;
+    if (!finalMessage.includes(approvalUrl)) {
+      finalMessage = `${finalMessage}\n\nApprove or request changes: ${approvalUrl}`;
+    }
+  }
+
   // Send text alert
   const textRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text: message }),
+    body: JSON.stringify({ chat_id: chatId, text: finalMessage }),
   });
 
   if (!textRes.ok) {
@@ -362,7 +430,7 @@ async function alertOwner({ message }) {
     const formData = new FormData();
     formData.append('chat_id', chatId);
     formData.append('document', new Blob([pdfBuffer], { type: 'application/pdf' }), 'proposal.pdf');
-    formData.append('caption', 'Proposal PDF attached');
+    formData.append('caption', approvalMode ? 'PENDING APPROVAL — Proposal PDF' : 'Proposal PDF attached');
 
     await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, {
       method: 'POST',
@@ -389,7 +457,8 @@ async function executeTool(name, args) {
 // [CUSTOMIZE] Claude will replace everything below with YOUR identity, voice,
 // services, and triage rules from your CLAUDE.md.
 
-const AGENT_SYSTEM_PROMPT = `You are an AI agent acting on behalf of [YOUR NAME].
+function buildSystemPrompt(approvalMode, proposalId) {
+  const basePrompt = `You are an AI agent acting on behalf of [YOUR NAME].
 
 You have received intake data from a website visitor. Your job:
 1. Write a personalized proposal in [YOUR NAME]'s voice
@@ -417,10 +486,31 @@ Write 4-5 sections:
 - Write the proposal in YOUR voice — direct, personal, specific to their situation
 - Score the lead using the triage rules (HIGH/MEDIUM/LOW)
 - Call render_proposal_pdf with the proposal sections
-- Call send_email with a warm, short email and the PDF attached
 - If the store_lead tool is available, call it with all lead data and score
-- Call alert_owner with a summary: company, contact, challenge, score, and one line on why
 - You decide the order. You can call multiple tools at once if they are independent.`;
+
+  if (!approvalMode) {
+    return basePrompt + `
+- Call send_email with a warm, short email and the PDF attached (send to the visitor)
+- Call alert_owner with a summary: company, contact, challenge, score, and one line on why`;
+  }
+
+  const siteUrl = process.env.SITE_URL || 'https://my-site-blue-kappa.vercel.app';
+  const approvalUrl = `${siteUrl}/api/approve-proposal?id=${proposalId}`;
+  const ownerEmail = process.env.OWNER_EMAIL || 'sher.pallavi@gmail.com';
+
+  return basePrompt + `
+- Call send_email with to="${ownerEmail}", subject starting with "[REVIEW REQUIRED]", a brief review note, and attach_pdf: true
+  DO NOT send to the visitor — the owner must approve first
+- Call alert_owner with a message that:
+  - Starts with "PENDING APPROVAL"
+  - Includes the lead name, company, challenge, and score
+  - Includes this approval link: ${approvalUrl}
+  - Example format: "PENDING APPROVAL\\n\\nLead: [Name] — [Company]\\nScore: HIGH\\nChallenge: [1 sentence]\\n\\nApprove or request changes: ${approvalUrl}"
+
+## APPROVAL MODE — ACTIVE
+This proposal will NOT go to the visitor until you (the owner) review and approve it at the link above.`;
+}
 
 // ── Main handler ────────────────────────────────────────────────────────────
 // Works as both Express route (local dev) and Vercel serverless function
@@ -441,25 +531,33 @@ module.exports = async function handler(req, res) {
     return res.status(400).json({ error: 'conversation or intakeData required' });
   }
 
-  // Reset PDF state for this request
+  // Reset request-scoped state
   proposalPdfBase64 = null;
+  capturedLeadData = {};
+  capturedProposalSections = [];
+
+  const approvalMode = process.env.APPROVAL_MODE === 'true';
+  pendingProposalId = approvalMode ? crypto.randomBytes(16).toString('hex') : null;
 
   // Build context from intake data or conversation transcript
   const intakeContext = resolvedIntake
     ? `VISITOR INTAKE DATA:\n${JSON.stringify(resolvedIntake, null, 2)}`
     : `CONVERSATION TRANSCRIPT:\n${resolvedConversation.map(m => `${m.role}: ${m.content}`).join('\n')}`;
 
+  capturedIntakeContext = intakeContext;
+
   // Build tools list — store_lead only available if Supabase is configured
   const tools = getTools();
-  const supabaseEnabled = tools.some(t => t.function?.name === 'store_lead');
-  console.log(`Agent starting with ${tools.length} tools${supabaseEnabled ? ' (Supabase enabled)' : ''}`);
+  const supabaseReady = !!(process.env.SUPABASE_URL && process.env.SUPABASE_KEY);
+  console.log(`Agent starting — approval mode: ${approvalMode}, Supabase: ${supabaseReady ? 'ready' : 'not configured'}`);
+  if (approvalMode) console.log(`Pending proposal ID: ${pendingProposalId}`);
 
   let messages = [
-    { role: 'system', content: AGENT_SYSTEM_PROMPT },
+    { role: 'system', content: buildSystemPrompt(approvalMode, pendingProposalId) },
     { role: 'user', content: `${intakeContext}\n\nPlease write a personalized proposal, score this lead, and use your tools to send everything.` },
   ];
 
-  const results = { proposal: false, email: false, stored: false, alerted: false };
+  const results = { proposal: false, email: false, stored: false, alerted: false, approval_pending: approvalMode };
 
   // ── Agent loop — max 5 turns for safety ──
   for (let turn = 1; turn <= 5; turn++) {
@@ -537,5 +635,9 @@ module.exports = async function handler(req, res) {
   }
 
   console.log('Agent pipeline complete:', results);
-  return res.json({ success: true, results });
+  return res.json({
+    success: true,
+    results,
+    ...(approvalMode && pendingProposalId ? { proposal_id: pendingProposalId } : {}),
+  });
 };
