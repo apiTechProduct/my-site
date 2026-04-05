@@ -21,6 +21,7 @@
 
 const { PDFDocument, rgb, StandardFonts } = require('pdf-lib');
 const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 const { storePendingProposal } = require('./_pending-proposals');
 
 // ── Tool definitions for Claude ─────────────────────────────────────────────
@@ -301,50 +302,51 @@ async function sendEmail({ to, subject, body, attach_pdf }) {
     const ownerSubject = `[REVIEW REQUIRED] Proposal for ${capturedLeadData.company || to}`;
     const ownerBody = `A new proposal is ready for your review.\n\nLead: ${capturedLeadData.name || 'Unknown'} — ${capturedLeadData.company || ''}\nScore: ${capturedLeadData.score || 'TBD'}\nChallenge: ${capturedLeadData.challenge || ''}\n\nApproval link: ${approvalUrl}\n\nThe proposal PDF is attached.`;
 
-    const result = await sendEmailViaResend(ownerEmail, ownerSubject, ownerBody, true);
+    const result = await sendEmailViaGmail(ownerEmail, ownerSubject, ownerBody, true);
     return { ...result, approval_pending: true, proposal_id: pendingProposalId, approval_url: approvalUrl };
   }
 
-  return sendEmailViaResend(to, subject, body, attach_pdf);
+  return sendEmailViaGmail(to, subject, body, attach_pdf);
 }
 
-async function sendEmailViaResend(to, subject, body, attach_pdf) {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) return { success: false, error: 'RESEND_API_KEY not configured' };
+function createGmailTransport() {
+  const user = process.env.GMAIL_USER;
+  const pass = process.env.GMAIL_APP_PASSWORD;
+  if (!user || !pass) return null;
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: { user, pass },
+  });
+}
 
-  const payload = {
-    // [CUSTOMIZE] Change display name. Keep onboarding@resend.dev (Resend free tier requirement)
-    from: 'Pallavi Sher <onboarding@resend.dev>',
-    // Resend free tier only delivers to the account owner email — swap out when domain is verified
-    to: 'techforever5772@gmail.com',
+async function sendEmailViaGmail(to, subject, body, attach_pdf) {
+  const user = process.env.GMAIL_USER;
+  const transport = createGmailTransport();
+  if (!transport) return { success: false, error: 'GMAIL_USER or GMAIL_APP_PASSWORD not configured' };
+
+  const mailOptions = {
+    from: `Pallavi Sher <${user}>`,
+    to,
     subject,
     text: body,
   };
 
   if (attach_pdf && proposalPdfBase64) {
-    payload.attachments = [{
+    mailOptions.attachments = [{
       filename: 'proposal.pdf',
-      content: proposalPdfBase64,
+      content: Buffer.from(proposalPdfBase64, 'base64'),
+      contentType: 'application/pdf',
     }];
   }
 
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    console.error('Resend error:', err);
-    return { success: false, error: `Resend API error: ${res.status}` };
+  try {
+    const info = await transport.sendMail(mailOptions);
+    console.log('Email sent:', info.messageId);
+    return { success: true, message_id: info.messageId };
+  } catch (err) {
+    console.error('Gmail error:', err.message);
+    return { success: false, error: err.message };
   }
-
-  const data = await res.json();
-  return { success: true, email_id: data.id };
 }
 
 async function storeLead(leadData) {

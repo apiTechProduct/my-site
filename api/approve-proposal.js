@@ -10,47 +10,42 @@
 //     body: { action: 'revise', id, instructions }
 // ============================================================================
 
+const nodemailer = require('nodemailer');
 const { PDFDocument, rgb, StandardFonts } = require('pdf-lib');
 const { getPendingProposal, updatePendingProposal } = require('./_pending-proposals');
 
 // ── Approve: send proposal to visitor ───────────────────────────────────────
 
 async function approveAndSend(proposal) {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) return { success: false, error: 'RESEND_API_KEY not configured' };
+  const user = process.env.GMAIL_USER;
+  const pass = process.env.GMAIL_APP_PASSWORD;
+  if (!user || !pass) return { success: false, error: 'GMAIL_USER or GMAIL_APP_PASSWORD not configured' };
 
-  const payload = {
-    from: 'Pallavi Sher <onboarding@resend.dev>',
-    // Resend free tier: always delivers to account owner — swap when domain verified
-    to: 'techforever5772@gmail.com',
+  const transport = nodemailer.createTransport({ service: 'gmail', auth: { user, pass } });
+
+  const mailOptions = {
+    from: `Pallavi Sher <${user}>`,
+    to: proposal.visitor_email,
     subject: proposal.visitor_subject,
     text: proposal.visitor_body,
   };
 
   if (proposal.pdf_base64) {
-    payload.attachments = [{
+    mailOptions.attachments = [{
       filename: 'proposal.pdf',
-      content: proposal.pdf_base64,
+      content: Buffer.from(proposal.pdf_base64, 'base64'),
+      contentType: 'application/pdf',
     }];
   }
 
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    console.error('Resend error on approve:', err);
-    return { success: false, error: `Resend API error: ${res.status}` };
+  try {
+    const info = await transport.sendMail(mailOptions);
+    console.log('Proposal sent to visitor:', info.messageId);
+    return { success: true, message_id: info.messageId };
+  } catch (err) {
+    console.error('Gmail error on approve:', err.message);
+    return { success: false, error: err.message };
   }
-
-  const data = await res.json();
-  return { success: true, email_id: data.id };
 }
 
 async function sendTelegramConfirmation(proposal) {

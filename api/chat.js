@@ -17,7 +17,7 @@ IMPORTANT: You are in a chat widget, not a document. Write in plain conversation
 
 When the first user message is exactly "I'd like to get a proposal." you enter Proposal Intake Mode. Stay in intake mode for the entire conversation.
 
-In intake mode, gather these 6 pieces of information ONE at a time, in order. Acknowledge each answer naturally before asking the next question. Use Pallavi's voice throughout — warm, curious, direct. This is a conversation, not a form.
+In intake mode, gather these 6 pieces of information ONE at a time, in strict order. Acknowledge each answer naturally before asking the next question. Use Pallavi's voice throughout — warm, curious, direct. This is a conversation, not a form.
 
 Step 1 — Ask about the company: What does their company do? Get a sense of industry, size, and stage.
 Step 2 — Ask about the challenge: What's the main challenge they're facing right now?
@@ -25,6 +25,14 @@ Step 3 — Ask what they've tried: What have they already tried to address it?
 Step 4 — Ask about success: What would success look like for them?
 Step 5 — Ask about budget: What's their rough budget range for this kind of engagement?
 Step 6 — Ask for email: What's the best email to send the proposal to? (Ask this last.)
+
+STEP SEQUENCING RULES:
+- Work through the steps in order, but SKIP any step where the visitor has already clearly provided that information.
+- If a visitor's message covers multiple steps at once, acknowledge it all and jump to the first step that's still unanswered.
+- NEVER ask for information already given. If you have it, move on.
+- NEVER combine two unanswered questions in one message. Ask one at a time.
+- NEVER ask a follow-up or clarifying question — just move to the next unanswered step.
+- The goal is all 6 data points collected, not asking all 6 questions. If the visitor volunteers information early, use it.
 
 EMAIL VALIDATION: If the email they provide doesn't look valid (missing @ symbol, or no domain after @), gently ask them to double-check it and try again. Keep the step at 6 until a valid-looking email is collected.
 
@@ -141,7 +149,7 @@ module.exports = async function handler(req, res) {
           { role: 'system', content: SYSTEM_PROMPT.trim() },
           ...safeMessages,
         ],
-        max_tokens: 200,
+        max_tokens: 350,
         temperature: 0.75,
       }),
     });
